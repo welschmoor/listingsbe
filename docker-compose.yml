@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  listingsdb:
+    image: postgres:12.2-alpine
+    container_name: "listingsdb"
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=listingsdb
+      - POSTGRES_USER=listingsdb
+      - POSTGRES_PASSWORD=postgres
+    networks:
+      - fullstack
+    volumes:
+      - database_postgres:/var/lib/postgresql/data
+
+volumes:
+  database_postgres:
+
+networks:
+  fullstack:
+    driver: bridge
