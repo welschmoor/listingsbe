@@ -109,11 +109,45 @@ func (lm ListingModel) Select(id int64) (*Listing, error) {
 
 // Add a placeholder method for updating a specific record in the listings table.
 func (lm ListingModel) Update(listing *Listing) error {
-	return nil
+	rows := lm.DB.QueryRow(
+		`UPDATE listings 
+		SET title = $1, description = $2, price = $3, categories = $4, version = version + 1
+		WHERE id = $5
+		RETURNING version;`,
+		listing.Title,
+		listing.Description,
+		listing.Price,
+		pq.Array(listing.Categories),
+		listing.ID,
+	)
+
+	return rows.Scan(
+		&listing.Version,
+	)
 }
 
 // Add a placeholder method for deleting a specific record from the listings table.
 func (lm ListingModel) Delete(id int64) error {
+	if id < 1 {
+		return ErrNotFoundRecord
+	}
+
+	res, err := lm.DB.Exec(
+		`DELETE FROM listings 
+		WHERE id = $1;`,
+		id,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowsnum, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsnum < 1 {
+		return ErrNotFoundRecord
+	}
 	return nil
 }
 

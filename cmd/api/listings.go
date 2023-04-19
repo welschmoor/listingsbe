@@ -79,3 +79,84 @@ func (app *application) postListing(w http.ResponseWriter, r *http.Request) {
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil || id < 1 {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	// Fetch the existing listing record from the database, sending a 404 Not Found // response to the client if we couldn't find a matching record.
+	listing, err := app.models.Listings.Select(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrNotFoundRecord):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	var input struct {
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Price       int64    `json:"price"`
+		Categories  []string `json:"categories"`
+	}
+
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	listing.Title = input.Title
+	listing.Description = input.Description
+	listing.Price = input.Price
+	listing.Categories = input.Categories
+
+	v := validator.New()
+	data.ValidateListing(v, listing)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	//save to db:
+	err = app.models.Listings.Update(listing)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusCreated, envelope{"listing": listing}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) deleteListingById(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil || id < 1 {
+		app.notFoundResponse(w, r)
+		return
+	}
+
+	err = app.models.Listings.Delete(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrNotFoundRecord):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusNoContent, envelope{"message": "deleted!"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
