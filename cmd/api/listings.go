@@ -1,9 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"letsgofurther/internal/data"
+	"letsgofurther/internal/validator"
 	"net/http"
 	"time"
 )
@@ -32,27 +32,30 @@ func (app *application) getListingById(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) postListing(w http.ResponseWriter, r *http.Request) {
-	// Declare an anonymous struct to hold the information that we expect to be in the
-	// HTTP request body (note that the field names and types in the struct are a subset
-	// of the Movie struct that we created earlier). This struct will be our *target
-	// decode destination*.
 	var input struct {
 		Title       string   `json:"title"`
 		Description string   `json:"description"`
-		Price       int64    `json:"runtime"`
+		Price       int64    `json:"price"`
 		Categories  []string `json:"categories"`
 	}
-	// Initialize a new json.Decoder instance which reads from the request body, and
-	// then use the Decode() method to decode the body contents into the input struct.
-	// Importantly, notice that when we call Decode() we pass a *pointer* to the input
-	// struct as the target decode destination. If there was an error during decoding,
-	// we also use our generic errorResponse() helper to send the client a 400 Bad
-	// Request response containing the error message.
-	err := json.NewDecoder(r.Body).Decode(&input)
+
+	err := app.readJSON(w, r, &input)
 	if err != nil {
-		app.errorResponse(w, r, http.StatusBadRequest, err.Error())
+		app.badRequestResponse(w, r, err)
 		return
 	}
-	// Dump the contents of the input struct in a HTTP response.
+
+	v := validator.New()
+	lis := data.Listing{
+		Title:       input.Title,
+		Description: input.Description,
+		Price:       input.Price,
+		Categories:  input.Categories,
+	}
+	data.ValidateListing(v, &lis)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
 	fmt.Fprintf(w, "%+v\n", input)
 }
