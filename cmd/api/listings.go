@@ -6,8 +6,10 @@ import (
 	"letsgofurther/internal/data"
 	"letsgofurther/internal/validator"
 	"net/http"
+	"strconv"
 )
 
+/* GET */
 func (app *application) getListingById(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil || id < 1 {
@@ -32,6 +34,7 @@ func (app *application) getListingById(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/* POST */
 func (app *application) postListing(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Title       string   `json:"title"`
@@ -80,7 +83,8 @@ func (app *application) postListing(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
+/* PATCH */
+func (app *application) patchListingById(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil || id < 1 {
 		app.notFoundResponse(w, r)
@@ -99,10 +103,19 @@ func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If the request contains a X-Expected-Version header, verify that the listing
+	// version in the database matches the expected version specified in the header.
+	if r.Header.Get("X-Expected-Version") != "" {
+		if strconv.FormatInt(int64(listing.Version), 32) != r.Header.Get("X-Expected-Version") {
+			app.editConflictResponse(w, r)
+			return
+		}
+	}
+
 	var input struct {
-		Title       string   `json:"title"`
-		Description string   `json:"description"`
-		Price       int64    `json:"price"`
+		Title       *string  `json:"title"`
+		Description *string  `json:"description"`
+		Price       *int64   `json:"price"`
 		Categories  []string `json:"categories"`
 	}
 
@@ -112,10 +125,19 @@ func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	listing.Title = input.Title
-	listing.Description = input.Description
-	listing.Price = input.Price
-	listing.Categories = input.Categories
+	//if the pointer input.Title is nil means the argument is not empty
+	if input.Title != nil {
+		listing.Title = *input.Title
+	}
+	if input.Description != nil {
+		listing.Description = *input.Description
+	}
+	if input.Price != nil {
+		listing.Price = *input.Price
+	}
+	if input.Categories != nil {
+		listing.Categories = input.Categories
+	}
 
 	v := validator.New()
 	data.ValidateListing(v, listing)
@@ -127,7 +149,12 @@ func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
 	//save to db:
 	err = app.models.Listings.Update(listing)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
@@ -137,6 +164,7 @@ func (app *application) putListingById(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/* DELETE */
 func (app *application) deleteListingById(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil || id < 1 {

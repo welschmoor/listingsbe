@@ -112,18 +112,28 @@ func (lm ListingModel) Update(listing *Listing) error {
 	rows := lm.DB.QueryRow(
 		`UPDATE listings 
 		SET title = $1, description = $2, price = $3, categories = $4, version = version + 1
-		WHERE id = $5
+		WHERE id = $5 AND version = $6
 		RETURNING version;`,
 		listing.Title,
 		listing.Description,
 		listing.Price,
 		pq.Array(listing.Categories),
 		listing.ID,
+		listing.Version,
 	)
 
-	return rows.Scan(
+	err := rows.Scan(
 		&listing.Version,
 	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 // Add a placeholder method for deleting a specific record from the listings table.
