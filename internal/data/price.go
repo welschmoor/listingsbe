@@ -5,15 +5,15 @@ import (
 	"strconv"
 )
 
-// Declare a custom Runtime type, which has the underlying type int32 (the same as our
-// Movie struct field).
+// Declare a custom Price type, which has the underlying type int32 (the same as our
+// Listing struct field).
 type Price int64
 
-// Implement a MarshalJSON() method on the Runtime type so that it satisfies the
-// json.Marshaler interface. This should return the JSON-encoded value for the movie
-// runtime (in our case, it will return a string in the format "<runtime> mins").
+// Implement a MarshalJSON() method on the Price type so that it satisfies the
+// json.Marshaler interface. This should return the JSON-encoded value for the listing
+// price (in our case, it will return a string in the format "<price> dallas").
 func (r Price) MarshalJSON() ([]byte, error) {
-	// Generate a string containing the movie runtime in the required format.
+	// Generate a string containing the listng price in the required format.
 	jsonValue := fmt.Sprintf("%d dallas", r)
 	// Use the strconv.Quote() function on the string to wrap it in double quotes. It
 	// needs to be surrounded by double quotes in order to be a valid *JSON string*.
