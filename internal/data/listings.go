@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"letsgofurther/internal/validator"
 	"time"
 
@@ -174,46 +175,56 @@ func (lm ListingModel) Delete(id int64) error {
 }
 
 /* SELECT ALL */
-func (ml ListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, error) {
+func (ml ListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, Metadata, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	rows, err := ml.DB.QueryContext(
 		ctx,
-		`SELECT id, title, description, price, categories, created_at
-		FROM listings
-		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
-		AND (categories @> $2 OR $2 = '{}')
-		ORDER by id DESC;`,
+		fmt.Sprintf(
+			`SELECT count(*) OVER(), id, title, description, price, categories, created_at, version
+			FROM listings
+			WHERE (to_tsvector('german', title) @@ plainto_tsquery('german', $1) OR $1 = '')
+			AND (categories @> $2 OR $2 = '{}')
+			ORDER BY %s %s, id DESC
+			LIMIT $3 OFFSET $4;`, filters.sortColumn(), filters.sortDirection(),
+		),
 		title,
 		pq.Array(categories),
+		filters.limit(),
+		filters.offset(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 	defer rows.Close()
 
+	totalRecords := 0
 	listings := []*Listing{} // equals to empty slice; if we do var listings []*Listing then we'll get nil
 	for rows.Next() {
 		var listing Listing
 		err := rows.Scan(
+			&totalRecords,
 			&listing.ID,
 			&listing.Title,
 			&listing.Description,
 			&listing.Price,
 			pq.Array(&listing.Categories),
 			&listing.CreatedAt,
+			&listing.Version,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 		listings = append(listings, &listing)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
-	return listings, nil
+
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+	return listings, metadata, nil
 }
 
 /* MOCK MODEL */
@@ -226,8 +237,8 @@ func (lm MockListingModel) Insert(listing *Listing) error { // Mock the action..
 func (lm MockListingModel) Select(id int64) (*Listing, error) { // Mock the action...
 	return &Listing{}, nil
 }
-func (lm MockListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, error) { // Mock the action...
-	return []*Listing{}, nil
+func (lm MockListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, Metadata, error) { // Mock the action...
+	return []*Listing{}, Metadata{}, nil
 }
 func (lm MockListingModel) Update(listing *Listing) error { // Mock the action...
 	return nil

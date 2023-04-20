@@ -205,11 +205,11 @@ func (app *application) getAllListings(w http.ResponseWriter, r *http.Request) {
 	input.Title = app.readString(qs, "title", "")
 	input.Categories = app.readCSV(qs, "categories", []string{})
 	input.Filters.Page = app.readInt(qs, "page", 1, v)
-	input.Filters.PageSize = app.readInt(qs, "page_size", 9, v)
-	input.Filters.Sort = app.readString(qs, "sort", "date")
+	input.Filters.PageSize = app.readInt(qs, "page_size", 12, v)
+	input.Filters.Sort = app.readString(qs, "sort", "id")
 	input.Filters.SortSafelist = []string{
-		"id", "date", "price", "title",
-		"-id", "-date", "-price", "-title",
+		"id", "created_at", "price", "title",
+		"-id", "-created_at", "-price", "-title",
 	}
 
 	data.ValidateFilters(v, input.Filters)
@@ -218,12 +218,12 @@ func (app *application) getAllListings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	listings, err := app.models.Listings.SelectAll(input.Title, input.Categories, input.Filters)
+	listings, metadata, err := app.models.Listings.SelectAll(input.Title, input.Categories, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"listings": listings}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"listings": listings, "metadata": metadata}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

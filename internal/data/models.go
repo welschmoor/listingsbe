@@ -16,7 +16,7 @@ type Models struct {
 	Listings interface {
 		Insert(listing *Listing) error
 		Select(id int64) (*Listing, error)
-		SelectAll(title string, categories []string, filters Filters) ([]*Listing, error)
+		SelectAll(title string, categories []string, filters Filters) ([]*Listing, Metadata, error)
 		Update(listing *Listing) error
 		Delete(id int64) error
 	}
