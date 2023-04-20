@@ -188,3 +188,43 @@ func (app *application) deleteListingById(w http.ResponseWriter, r *http.Request
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) getAllListings(w http.ResponseWriter, r *http.Request) {
+	// To keep things consistent with our other handlers, we'll define an input struct
+	// to hold the expected values from the request query string.
+	var input struct {
+		Title      string
+		Categories []string
+		data.Filters
+	}
+
+	v := validator.New()
+
+	qs := r.URL.Query()
+
+	input.Title = app.readString(qs, "title", "")
+	input.Categories = app.readCSV(qs, "categories", []string{})
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 9, v)
+	input.Filters.Sort = app.readString(qs, "sort", "date")
+	input.Filters.SortSafelist = []string{
+		"id", "date", "price", "title",
+		"-id", "-date", "-price", "-title",
+	}
+
+	data.ValidateFilters(v, input.Filters)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	listings, err := app.models.Listings.SelectAll(input.Title, input.Categories, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+
+	err = app.writeJSON(w, http.StatusOK, envelope{"listings": listings}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}

@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"letsgofurther/internal/validator"
@@ -45,7 +46,10 @@ type ListingModel struct {
 
 // Add a placeholder method for inserting a new record in the listings table.
 func (lm ListingModel) Insert(listing *Listing) error {
-	rows := lm.DB.QueryRow(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	rows := lm.DB.QueryRowContext(
+		ctx,
 		`INSERT INTO listings (title, description, price, categories) VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, version`,
 		listing.Title,
@@ -53,10 +57,6 @@ func (lm ListingModel) Insert(listing *Listing) error {
 		listing.Price,
 		pq.Array(listing.Categories),
 	)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer rows.Close()
 
 	err := rows.Scan(
 		&listing.ID,
@@ -76,8 +76,12 @@ func (lm ListingModel) Select(id int64) (*Listing, error) {
 		return nil, ErrNotFoundRecord
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	var lis Listing
-	rows := lm.DB.QueryRow(
+	rows := lm.DB.QueryRowContext(
+		ctx,
 		`SELECT id, title, description, price, categories, created_at, updated_at, version
 		FROM listings
 		WHERE id = $1;`,
@@ -109,7 +113,11 @@ func (lm ListingModel) Select(id int64) (*Listing, error) {
 
 // Add a placeholder method for updating a specific record in the listings table.
 func (lm ListingModel) Update(listing *Listing) error {
-	rows := lm.DB.QueryRow(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows := lm.DB.QueryRowContext(
+		ctx,
 		`UPDATE listings 
 		SET title = $1, description = $2, price = $3, categories = $4, version = version + 1
 		WHERE id = $5 AND version = $6
@@ -142,7 +150,11 @@ func (lm ListingModel) Delete(id int64) error {
 		return ErrNotFoundRecord
 	}
 
-	res, err := lm.DB.Exec(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	res, err := lm.DB.ExecContext(
+		ctx,
 		`DELETE FROM listings 
 		WHERE id = $1;`,
 		id,
@@ -161,6 +173,44 @@ func (lm ListingModel) Delete(id int64) error {
 	return nil
 }
 
+func (ml ListingModel) SelectAll(title string, genres []string, filters Filters) ([]*Listing, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := ml.DB.QueryContext(
+		ctx,
+		`SELECT id, title, description, price, categories, created_at
+		FROM listings
+		ORDER by id DESC;`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var listings []*Listing
+	for rows.Next() {
+		var listing Listing
+		err := rows.Scan(
+			&listing.ID,
+			&listing.Title,
+			&listing.Description,
+			&listing.Price,
+			pq.Array(&listing.Categories),
+			&listing.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		listings = append(listings, &listing)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return listings, nil
+}
+
 /* MOCK MODEL */
 
 type MockListingModel struct{}
@@ -170,6 +220,9 @@ func (lm MockListingModel) Insert(listing *Listing) error { // Mock the action..
 }
 func (lm MockListingModel) Select(id int64) (*Listing, error) { // Mock the action...
 	return &Listing{}, nil
+}
+func (lm MockListingModel) SelectAll(title string, genres []string, filters Filters) ([]*Listing, error) { // Mock the action...
+	return []*Listing{}, nil
 }
 func (lm MockListingModel) Update(listing *Listing) error { // Mock the action...
 	return nil
