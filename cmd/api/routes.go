@@ -18,5 +18,5 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPatch, "/v1/listings/:id", app.patchListingById)
 	router.HandlerFunc(http.MethodDelete, "/v1/listings/:id", app.deleteListingById)
 
-	return app.recoverPanic(router)
+	return app.recoverPanic(app.rateLimit(router))
 }
