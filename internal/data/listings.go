@@ -44,7 +44,7 @@ type ListingModel struct {
 	DB *sql.DB
 }
 
-// Add a placeholder method for inserting a new record in the listings table.
+/* INSERT ONE */
 func (lm ListingModel) Insert(listing *Listing) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -70,7 +70,7 @@ func (lm ListingModel) Insert(listing *Listing) error {
 	return nil
 }
 
-// Add a placeholder method for fetching a specific record from the listings table.
+/* SELECT ONE */
 func (lm ListingModel) Select(id int64) (*Listing, error) {
 	if id < 1 {
 		return nil, ErrNotFoundRecord
@@ -111,7 +111,7 @@ func (lm ListingModel) Select(id int64) (*Listing, error) {
 	return &lis, nil
 }
 
-// Add a placeholder method for updating a specific record in the listings table.
+/* UPDATE ONE */
 func (lm ListingModel) Update(listing *Listing) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -144,7 +144,7 @@ func (lm ListingModel) Update(listing *Listing) error {
 	return nil
 }
 
-// Add a placeholder method for deleting a specific record from the listings table.
+/* DELETE ONE */
 func (lm ListingModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrNotFoundRecord
@@ -173,7 +173,8 @@ func (lm ListingModel) Delete(id int64) error {
 	return nil
 }
 
-func (ml ListingModel) SelectAll(title string, genres []string, filters Filters) ([]*Listing, error) {
+/* SELECT ALL */
+func (ml ListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -181,14 +182,18 @@ func (ml ListingModel) SelectAll(title string, genres []string, filters Filters)
 		ctx,
 		`SELECT id, title, description, price, categories, created_at
 		FROM listings
+		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
+		AND (categories @> $2 OR $2 = '{}')
 		ORDER by id DESC;`,
+		title,
+		pq.Array(categories),
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var listings []*Listing
+	listings := []*Listing{} // equals to empty slice; if we do var listings []*Listing then we'll get nil
 	for rows.Next() {
 		var listing Listing
 		err := rows.Scan(
@@ -221,7 +226,7 @@ func (lm MockListingModel) Insert(listing *Listing) error { // Mock the action..
 func (lm MockListingModel) Select(id int64) (*Listing, error) { // Mock the action...
 	return &Listing{}, nil
 }
-func (lm MockListingModel) SelectAll(title string, genres []string, filters Filters) ([]*Listing, error) { // Mock the action...
+func (lm MockListingModel) SelectAll(title string, categories []string, filters Filters) ([]*Listing, error) { // Mock the action...
 	return []*Listing{}, nil
 }
 func (lm MockListingModel) Update(listing *Listing) error { // Mock the action...
