@@ -20,12 +20,18 @@ type Models struct {
 		Update(listing *Listing) error
 		Delete(id int64) error
 	}
+	Users interface {
+		Update(user *User) error
+		SelectByEmail(email string) (*User, error)
+		Insert(user *User) error
+	}
 }
 
 // For ease of use, we also add a New() method which returns a Models struct containing // the initialized ListingModel.
 func NewModels(db *sql.DB) Models {
 	return Models{
 		Listings: ListingModel{DB: db},
+		Users: UserModel{DB: db},
 	}
 }
 
