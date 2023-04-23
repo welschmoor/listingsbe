@@ -3,14 +3,17 @@ package data
 import (
 	"context"
 	"database/sql"
+	"letsgofurther/internal/constants"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 // Define a Permissions slice, which we will use to hold the permission codes (like
-// "movies:read" and "movies:write") for a single user.
+// "listings:read" and "listings:write") for a single user.
 type Permissions []string
 
-// Add a helper method to check whether the Permissions slice contains a specific 
+// Add a helper method to check whether the Permissions slice contains a specific
 // permission code.
 func (p Permissions) Include(code string) bool {
 	for i := range p {
@@ -27,10 +30,10 @@ type PermissionModel struct {
 }
 
 // The GetAllForUser() method returns all permission codes for a specific user in a
-// Permissions slice. The code in this method should feel very familiar --- it uses the 
-// standard pattern that we've already seen before for retrieving multiple data rows in 
+// Permissions slice. The code in this method should feel very familiar --- it uses the
+// standard pattern that we've already seen before for retrieving multiple data rows in
 // an SQL query.
-func (m PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
+func (m PermissionModel) SelectAllForUser(userID int64) (Permissions, error) {
 	query := `
 	SELECT permissions.code
 	FROM permissions
@@ -61,4 +64,18 @@ func (m PermissionModel) GetAllForUser(userID int64) (Permissions, error) {
 	}
 
 	return permissions, nil
+}
+
+func (pm PermissionModel) AddForUser(userId int64, permissions ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), constants.TIMEOUT_DURATION)
+	defer cancel()
+
+	_, err := pm.DB.ExecContext(
+		ctx,
+		`INSERT INTO users_permissions
+		SELECT $1, permissions.id FROM permissions WHERE permissions.code = ANY($2);`,
+		userId,
+		pq.Array(permissions),
+	)
+	return err
 }

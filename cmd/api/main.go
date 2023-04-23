@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"letsgofurther/internal/data"
 	"letsgofurther/internal/jsonlog"
 	"letsgofurther/internal/mailer"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -86,6 +88,19 @@ func main() {
 	}
 	defer db.Close()
 	logger.PrintInfo("database connection pool established", nil)
+
+	expvar.NewString("version").Set(version)
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 
 	// Declare an instance of the application struct, containing the config struct and
 	// the logger.

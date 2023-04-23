@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// Define a custom ErrRecordNotFound error. We'll return this from our Get() method when 
+// Define a custom ErrRecordNotFound error. We'll return this from our Get() method when
 // looking up a listing that doesn't exist in our database.
 var (
 	ErrNotFoundRecord = errors.New("record not found")
 	ErrEditConflict   = errors.New("edit conflict")
 )
 
-// Create a Models struct which wraps the ListingModel. We'll add other models to this, 
+// Create a Models struct which wraps the ListingModel. We'll add other models to this,
 // like a UserModel and PermissionModel, as our build progresses.
 type Models struct {
 	Listings interface {
@@ -35,7 +35,8 @@ type Models struct {
 		DeleteAllForUser(scope string, userID int64) error
 	}
 	Permissions interface {
-		GetAllForUser(userID int64) (Permissions, error)
+		SelectAllForUser(userID int64) (Permissions, error)
+		AddForUser(userId int64, permissions ...string) error
 	}
 }
 

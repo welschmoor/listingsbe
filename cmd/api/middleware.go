@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
 	"letsgofurther/internal/data"
 	"letsgofurther/internal/validator"
@@ -212,4 +213,60 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 
 	// Wrap fn with the requireAuthenticatedUser() middleware before returning it.
 	return app.requireAuthenticatedUser(fn)
+}
+
+// Note that the first parameter for the middleware function is the permission code that
+// we require the user to have.
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		// Retrieve the user from the request context.
+		user := app.contextGetUser(r)
+
+		// Get the slice of permissions for the user.
+		permissions, err := app.models.Permissions.SelectAllForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+		// Check if the slice includes the required permission. If it doesn't, then
+		// return a 403 Forbidden response.
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+		// Otherwise they have the required permission so we call the next handler in
+		// the chain.
+		next.ServeHTTP(w, r)
+	}
+	// Wrap this with the requireActivatedUser() middleware before returning it.
+	return app.requireActivatedUser(fn)
+}
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) metrics(next http.Handler) http.Handler {
+	// Initialize the new expvar variables when the middleware chain is first built.
+	var (
+		totalRequestsReceived           = expvar.NewInt("total_requests_received")
+		totalResponsesSent              = expvar.NewInt("total_responses_sent")
+		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
+	)
+	// The following code will be run for every request...
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // Record the time that we started to process the request.
+		start := time.Now()
+		// Use the Add() method to increment the number of requests received by 1.
+		totalRequestsReceived.Add(1)
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+		// On the way back up the middleware chain, increment the number of responses // sent by 1.
+		totalResponsesSent.Add(1)
+		// Calculate the number of microseconds since we began to process the request, // then increment the total processing time by this amount.
+		duration := time.Since(start).Microseconds()
+		totalProcessingTimeMicroseconds.Add(duration)
+	})
 }

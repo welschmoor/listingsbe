@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -14,8 +15,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 
 	router.HandlerFunc(http.MethodGet, "/v1/listings", app.getAllListings)
-	router.HandlerFunc(http.MethodPost, "/v1/listings", app.postListing)
-	router.HandlerFunc(http.MethodGet, "/v1/listings/:id", app.requireActivatedUser(app.getListingById))
+	router.HandlerFunc(http.MethodPost, "/v1/listings", app.requirePermission("listings:write", app.postListing))
+	router.HandlerFunc(http.MethodGet, "/v1/listings/:id", app.requirePermission("listings:read", app.getListingById))
 	router.HandlerFunc(http.MethodPatch, "/v1/listings/:id", app.patchListingById)
 	router.HandlerFunc(http.MethodDelete, "/v1/listings/:id", app.deleteListingById)
 
@@ -25,5 +26,8 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/activation", app.postActivationTokenHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.postAuthenticationTokenHandler)
 
-	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
+	// Register a new GET /debug/vars endpoint pointing to the expvar handler.
+	router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
+
+	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router)))))
 }

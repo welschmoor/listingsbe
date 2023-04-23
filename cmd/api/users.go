@@ -65,6 +65,13 @@ func (app *application) postUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Add the "movies:read" permission for the new user.
+	err = app.models.Permissions.AddForUser(user.ID, "listings:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	//generate new token after user is inserted into db
 	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
@@ -147,7 +154,7 @@ func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 	user.Activated = true
 
 	// Save the updated user record in our database, checking for any edit conflicts in
-	// the same way that we did for our movie records.
+	// the same way that we did for our listings records.
 	err = app.models.Users.Update(user)
 	if err != nil {
 		switch {
