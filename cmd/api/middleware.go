@@ -333,7 +333,7 @@ func (app *application) metrics(next http.Handler) http.Handler {
 		// our new totalResponsesSentByStatus map to increment the count for the
 		// given status code by 1.
 		totalResponsesSentByStatus.Add(strconv.Itoa(mw.statusCode), 1)
-		
+
 		duration := time.Since(start).Microseconds()
 		totalProcessingTimeMicroseconds.Add(duration)
 	})

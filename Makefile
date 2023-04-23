@@ -1,7 +1,11 @@
 SHELL := /bin/bash
 
-# Include variables from the .envrc file
 include .envrc
+
+
+# ==================================================================================== # 
+# HELPERS
+# ==================================================================================== #
 
 ## help: print this help message
 help:
@@ -10,6 +14,13 @@ help:
 
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
+
+.PHONY: help confirm run dup cremig mversion mup mdown mdownone itdb audit
+
+
+# ==================================================================================== # 
+# DEVELOPMENT
+# ==================================================================================== #
 
 run:
 	go run ./cmd/api/ -db-dsn=${DSN}
@@ -36,4 +47,20 @@ mdownone: confirm
 itdb:
 	docker exec -it listingsdb psql -U listingsdb
 
-.PHONY: help confirm run dup cremig mversion mup mdown mdownone itdb
+
+# ==================================================================================== # 
+# QUALITY CONTROL
+# ==================================================================================== #
+
+## audit: tidy dependencies and format, vet and test all code; needs staticcheck installed
+audit:
+	@echo 'Tidying and verifying module dependencies...' 
+	go mod tidy
+	go mod verify
+	@echo 'Formatting code...'
+	go fmt ./...
+	@echo 'Vetting code...'
+	go vet ./...
+	staticcheck ./...
+	@echo 'Running tests...'
+	go test -race -vet=off ./...
