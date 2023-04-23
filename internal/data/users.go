@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"letsgofurther/internal/validator"
@@ -9,6 +10,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+var AnonymousUser = &User{}
 
 type User struct {
 	ID        int64     `json:"id"`
@@ -24,6 +27,11 @@ type User struct {
 type password struct {
 	plaintext *string
 	hash      []byte
+}
+
+// Check if a User instance is the AnonymousUser.
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }
 
 func (p *password) Set(plaintextPassword string) error {
@@ -204,4 +212,44 @@ func (um UserModel) Update(user *User) error {
 	}
 
 	return nil
+}
+
+func (um UserModel) SelectForToken(tokenScope, tokenPlaintext string) (*User, error) {
+	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
+	var user User
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	row := um.DB.QueryRowContext(
+		ctx,
+		`SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
+		FROM users
+		INNER JOIN tokens
+		ON users.id = tokens.user_id
+		WHERE tokens.hash = $1
+		AND tokens.scope = $2 
+		AND tokens.expiry > $3;`,
+		tokenHash[:], tokenScope, time.Now(),
+	)
+
+	err := row.Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.Name,
+		&user.Email,
+		&user.Password.hash,
+		&user.Activated,
+		&user.Version,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrNotFoundRecord
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }

@@ -12,13 +12,18 @@ func (app *application) routes() http.Handler {
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
 
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
+
 	router.HandlerFunc(http.MethodGet, "/v1/listings", app.getAllListings)
 	router.HandlerFunc(http.MethodPost, "/v1/listings", app.postListing)
-	router.HandlerFunc(http.MethodGet, "/v1/listings/:id", app.getListingById)
+	router.HandlerFunc(http.MethodGet, "/v1/listings/:id", app.requireActivatedUser(app.getListingById))
 	router.HandlerFunc(http.MethodPatch, "/v1/listings/:id", app.patchListingById)
 	router.HandlerFunc(http.MethodDelete, "/v1/listings/:id", app.deleteListingById)
 
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.postUser)
+	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 
-	return app.recoverPanic(app.rateLimit(router))
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/activation", app.postActivationTokenHandler)
+	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.postAuthenticationTokenHandler)
+
+	return app.recoverPanic(app.rateLimit(app.authenticate(router)))
 }
