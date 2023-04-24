@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	"letsgofurther/internal/data"
 	"letsgofurther/internal/jsonlog"
 	"letsgofurther/internal/mailer"
+	"letsgofurther/internal/vcs"
 	"os"
 	"runtime"
 	"sync"
@@ -16,7 +18,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const version = "1.0.0"
+var version = vcs.Version()
 
 type config struct {
 	port int
@@ -75,7 +77,15 @@ func main() {
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "c2228263d7ad0c", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Diggo <info@diggo.com>", "SMTP sender")
 
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+
 	flag.Parse()
+
+	// If the version flag value is true, then print out the version number and // immediately exit.
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		os.Exit(0)
+	}
 
 	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
