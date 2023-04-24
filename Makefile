@@ -15,7 +15,7 @@ help:
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
 
-.PHONY: help confirm run dup cremig mversion mup mdown mdownone itdb audit vendor
+.PHONY: help confirm run build dup cremig mversion mup mdown mdownone itdb audit vendor
 
 
 # ==================================================================================== # 
@@ -24,6 +24,9 @@ confirm:
 
 run:
 	go run ./cmd/api/ -db-dsn=${DSN}
+
+build:
+	go build -o=./bin/api ./cmd/api
 
 dup:
 	docker-compose up --build -d
