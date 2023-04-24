@@ -15,7 +15,7 @@ help:
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
 
-.PHONY: help confirm run build start dup cremig mversion mup mdown mdownone itdb audit vendor
+.PHONY: help confirm run build start dup cremig mversion mup mdown mdownone itdb audit vendor connect deploy
 
 
 # ==================================================================================== # 
@@ -27,7 +27,7 @@ run:
 
 build:
 	go build -ldflags="-s -w" -o=./bin/api ./cmd/api
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o=./bin/linux_amd64/api ./cmd/api
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o=./bin/linux_arm64/api ./cmd/api
 
 start:
 	./bin/api -port=4040 -db-dsn=${DSN} -limiter-enabled=false
@@ -79,3 +79,23 @@ vendor:
 	go mod verify
 	@echo 'Vendoring dependencies...'
 	go mod vendor
+
+
+# ==================================================================================== # 
+# PRODUCTION
+# ==================================================================================== #
+
+production_host_ip = '128.140.93.230'
+
+rootconnect:
+	ssh root@${production_host_ip}
+
+## production/connect: connect to the production server
+connect:
+	ssh listings@${production_host_ip}
+
+## prod deploy
+deploy:
+	rsync -P ./bin/linux_arm64/api listings@${production_host_ip}:~
+	rsync -rP --delete ./migrations listings@${production_host_ip}:~
+	ssh -t listings@${production_host_ip} 'migrate -path ~/migrations -database $$DSN up'
