@@ -15,7 +15,7 @@ help:
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
 
-.PHONY: help confirm run dup cremig mversion mup mdown mdownone itdb audit
+.PHONY: help confirm run dup cremig mversion mup mdown mdownone itdb audit vendor
 
 
 # ==================================================================================== # 
@@ -53,10 +53,7 @@ itdb:
 # ==================================================================================== #
 
 ## audit: tidy dependencies and format, vet and test all code; needs staticcheck installed
-audit:
-	@echo 'Tidying and verifying module dependencies...' 
-	go mod tidy
-	go mod verify
+audit: vendor
 	@echo 'Formatting code...'
 	go fmt ./...
 	@echo 'Vetting code...'
@@ -64,3 +61,11 @@ audit:
 	staticcheck ./...
 	@echo 'Running tests...'
 	go test -race -vet=off ./...
+
+## vendor: tidy and vendor dependencies
+vendor:
+	@echo 'Tidying and verifying module dependencies...' 
+	go mod tidy
+	go mod verify
+	@echo 'Vendoring dependencies...'
+	go mod vendor
